@@ -45,8 +45,9 @@ function itemList(type: string) {
   const items = getItems().filter((item) => item.type === type)
   if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
-  const alarmStatus = 'Notification' in window && Notification.permission === 'granted' ? 'notificação ativada' : 'notificação bloqueada nas configurações do navegador'
-  return `<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}${type === 'alarmes' ? ` · ${alarmStatus}` : ''} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
+  const alarmPermission = 'Notification' in window ? Notification.permission : 'unsupported'
+  const alarmStatus = alarmPermission === 'granted' ? 'notificação ativada' : alarmPermission === 'denied' ? 'notificação bloqueada nas configurações do navegador' : 'notificação ainda não autorizada'
+  return `${type === 'alarmes' && alarmPermission !== 'granted' ? `<div class="permission-help"><strong>Ative as notificações para receber seus alarmes</strong><small>Toque no cadeado ou no ícone de configurações ao lado do endereço do Hazuni e permita as notificações. Depois, recarregue esta página.</small><button class="primary-button" data-notification-help="true">Tentar ativar notificações</button></div>` : ''}<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}${type === 'alarmes' ? ` · ${alarmStatus}` : ''} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
 }
 
 function innerView() {
@@ -100,6 +101,12 @@ function showPhoto(id: string) {
   root.innerHTML = `<div class="photo-lightbox" data-close-photo="true"><button class="close-modal" data-close-photo="true">×</button><img src="${item.image}" alt="${escapeHtml(item.title)}"><p>${escapeHtml(item.title)}</p></div>`
   root.querySelectorAll<HTMLElement>('[data-close-photo]').forEach((element) => element.addEventListener('click', (event) => { if (event.target === element || element.classList.contains('close-modal')) root.innerHTML = '' }))
 }
+
+function requestNotifications() {
+  if (!('Notification' in window)) { window.alert('Este navegador não oferece notificações. Abra o Hazuni no Chrome ou Safari atualizado.'); return }
+  if (Notification.permission === 'denied') { window.alert('As notificações estão bloqueadas. Abra as configurações do navegador, entre nas permissões do site do Hazuni, permita Notificações e recarregue a página.'); return }
+  Notification.requestPermission().then(() => render())
+}
 function showAddModal() {
   const root = document.querySelector<HTMLDivElement>('#modal-root')!
   root.innerHTML = `<div class="modal-backdrop" data-close="true"><section class="add-sheet" role="dialog" aria-modal="true"><button class="close-modal" data-close="true">×</button><p class="eyebrow">COMEÇAR ALGO NOVO</p><h2>O que você quer criar?</h2><div class="quick-actions">${quickActions.map((action) => `<button class="quick-action" data-quick="${action.id}"><span>${action.icon}</span><strong>${action.label}</strong></button>`).join('')}</div></section></div>`
@@ -114,6 +121,7 @@ function bindEvents() {
   document.querySelectorAll<HTMLElement>('[data-add-tool]').forEach((element) => element.addEventListener('click', () => showForm(element.dataset.addTool!)))
   document.querySelectorAll<HTMLElement>('[data-delete]').forEach((element) => element.addEventListener('click', () => deleteItem(element.dataset.delete!)))
   document.querySelectorAll<HTMLElement>('[data-photo]').forEach((element) => element.addEventListener('click', () => showPhoto(element.dataset.photo!)))
+  document.querySelector<HTMLElement>('[data-notification-help]')?.addEventListener('click', requestNotifications)
   document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer') })
   document.querySelector<HTMLFormElement>('#settings-form')?.addEventListener('submit', (event) => { event.preventDefault(); const oldKey = storageKey(); const value = document.querySelector<HTMLInputElement>('#settings-name')!.value.trim(); if (!value) return; const oldItems = localStorage.getItem(oldKey); userName = value; localStorage.setItem('hazuni-user-name', userName); if (oldItems) localStorage.setItem(storageKey(), oldItems); render() })
 }
