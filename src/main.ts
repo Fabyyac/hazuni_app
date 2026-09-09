@@ -103,7 +103,7 @@ function showPhoto(id: string) {
 }
 
 function requestNotifications() {
-  if (!('Notification' in window)) { window.alert('Este navegador não oferece notificações. Abra o Hazuni no Chrome ou Safari atualizado.'); return }
+  if (!('Notification' in window)) { globalThis.alert('Este navegador não oferece notificações. Abra o Hazuni no Chrome ou Safari atualizado.'); return }
   if (Notification.permission === 'denied') { window.alert('As notificações estão bloqueadas. Abra as configurações do navegador, entre nas permissões do site do Hazuni, permita Notificações e recarregue a página.'); return }
   Notification.requestPermission().then(() => render())
 }
