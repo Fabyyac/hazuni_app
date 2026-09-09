@@ -126,6 +126,8 @@ Algumas evoluções planejadas para o Hazuni App incluem:
 
 As imagens escolhidas em **Fotos** são armazenadas no aparelho, exibidas em uma galeria com miniaturas e abertas em tamanho maior ao tocar sobre elas. A ferramenta **Pesquisar** envia a consulta para o Google em uma nova aba do navegador padrão do aparelho.
 
+Os **Alarmes** solicitam permissão para enviar notificações e verificam o horário enquanto o Hazuni estiver aberto. Para receber o aviso, permita notificações nas configurações do navegador. Alarmes que funcionem com o aplicativo totalmente fechado exigem uma versão instalada com notificações nativas.
+
 ## Licença
 
 Este projeto está em desenvolvimento e pode ser utilizado como base para a evolução do Hazuni App.

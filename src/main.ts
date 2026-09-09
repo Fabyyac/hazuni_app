@@ -14,6 +14,19 @@ function getItems(): Item[] { return JSON.parse(localStorage.getItem(storageKey(
 function saveItems(items: Item[]) { localStorage.setItem(storageKey(), JSON.stringify(items)) }
 function deleteItem(id: string) { saveItems(getItems().filter((item) => item.id !== id)); render() }
 
+function alarmNotificationKey(item: Item, date: Date) { return `hazuni-alarm-${item.id}-${date.toISOString().slice(0, 10)}` }
+function checkAlarms() {
+  const now = new Date()
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  getItems().filter((item) => item.type === 'alarmes' && item.detail === currentTime).forEach((item) => {
+    const notificationKey = alarmNotificationKey(item, now)
+    if (localStorage.getItem(notificationKey)) return
+    localStorage.setItem(notificationKey, 'shown')
+    if ('Notification' in window && Notification.permission === 'granted') new Notification(`Alarme: ${item.title}`, { body: `Está na hora: ${item.detail}`, tag: item.id })
+  })
+}
+setInterval(checkAlarms, 10000)
+
 function toolCard(tool: Tool) {
   const count = getItems().filter((item) => item.type === tool.id).length
   return `<button class="tool-card" data-tool="${tool.id}" aria-label="Abrir ${tool.label}"><span class="tool-icon ${tool.color}">${tool.icon}</span><span class="tool-copy"><strong>${tool.label}</strong><small>${tool.description}</small></span>${count ? `<span class="tool-badge">${count} ${count === 1 ? 'item' : 'itens'}</span>` : tool.badge ? `<span class="tool-badge">${tool.badge}</span>` : ''}<span class="card-arrow">↗</span></button>`
@@ -32,7 +45,8 @@ function itemList(type: string) {
   const items = getItems().filter((item) => item.type === type)
   if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
-  return `<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
+  const alarmStatus = 'Notification' in window && Notification.permission === 'granted' ? 'notificação ativada' : 'notificação bloqueada nas configurações do navegador'
+  return `<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}${type === 'alarmes' ? ` · ${alarmStatus}` : ''} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
 }
 
 function innerView() {
@@ -68,6 +82,7 @@ function showForm(type: string) {
       title = file?.name || 'Arquivo'
       if (type === 'fotos' && file?.type.startsWith('image/')) image = await fileToDataUrl(file)
     }
+    if (type === 'alarmes' && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
     items.unshift({ id: crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: new Date().toLocaleDateString('pt-BR'), image })
     saveItems(items)
