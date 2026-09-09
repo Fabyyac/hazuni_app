@@ -40,6 +40,10 @@ O Hazuni App foi pensado para oferecer:
 - Estrutura modular para adicionar novas ferramentas no futuro.
 - Estados de navegação para abrir cada ferramenta dentro do aplicativo.
 - Tela de primeiro acesso com personalização do nome.
+- Formulários para adicionar compromissos, alarmes, cálculos, contas, fotos, arquivos e anotações.
+- Dados persistidos no aparelho com armazenamento local.
+- Exclusão de itens salvos e contadores por ferramenta.
+- Pesquisa na internet e criação rápida pelo botão Adicionar.
 
 ## Tecnologias
 
