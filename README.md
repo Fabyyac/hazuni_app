@@ -122,6 +122,10 @@ Algumas evoluções planejadas para o Hazuni App incluem:
 - Sistema de favoritos personalizado.
 - Preferências do usuário e modo escuro.
 
+## Fotos e pesquisa
+
+As imagens escolhidas em **Fotos** são armazenadas no aparelho, exibidas em uma galeria com miniaturas e abertas em tamanho maior ao tocar sobre elas. A ferramenta **Pesquisar** envia a consulta para o Google em uma nova aba do navegador padrão do aparelho.
+
 ## Licença
 
 Este projeto está em desenvolvimento e pode ser utilizado como base para a evolução do Hazuni App.

@@ -1,7 +1,7 @@
 import './style.css'
 import { quickActions, tools, type Tool } from './tools'
 
-type Item = { id: string; type: string; title: string; detail: string; createdAt: string }
+type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string }
 const app = document.querySelector<HTMLDivElement>('#app')!
 let activeTool: Tool | null = null
 let activeNav = 'home'
@@ -12,7 +12,6 @@ function escapeHtml(value: string) { return value.replace(/[&<>'"]/g, (character
 function storageKey() { return `hazuni-items-${userName.toLowerCase()}` }
 function getItems(): Item[] { return JSON.parse(localStorage.getItem(storageKey()) ?? '[]') as Item[] }
 function saveItems(items: Item[]) { localStorage.setItem(storageKey(), JSON.stringify(items)) }
-function addItem(type: string, title: string, detail: string) { const items = getItems(); items.unshift({ id: crypto.randomUUID(), type, title, detail, createdAt: new Date().toLocaleDateString('pt-BR') }); saveItems(items) }
 function deleteItem(id: string) { saveItems(getItems().filter((item) => item.id !== id)); render() }
 
 function toolCard(tool: Tool) {
@@ -29,7 +28,12 @@ function render() {
 
 function loginView() { return `<main class="login-page"><div class="login-brand"><span>H</span><strong>HAZUNI</strong></div><section class="login-card"><div class="login-mark">✦</div><p class="eyebrow">SEU ESPAÇO PESSOAL</p><h1>Como podemos<br><em>te chamar?</em></h1><p class="login-copy">Crie seu espaço no Hazuni e deixe tudo do seu jeito.</p><form id="login-form"><label for="user-name">Seu nome</label><input id="user-name" name="user-name" type="text" placeholder="Digite seu nome" maxlength="40" required><button class="primary-button" type="submit">Entrar no meu espaço <span>→</span></button></form><small class="login-note">Seus dados ficam salvos apenas neste aparelho.</small></section><div class="login-decoration" aria-hidden="true">✦</div></main>` }
 function homeView() { return `<section class="welcome reveal"><p class="eyebrow">QUARTA-FEIRA, 09 DE SETEMBRO</p><h1>Bom dia, ${escapeHtml(userName)} <span>✦</span></h1><p class="subtitle">Tudo o que você precisa, em um só lugar.</p></section><section class="spotlight reveal-delay"><div><span class="spotlight-label">SEU DIA EM FOCO</span><h2>Pequenos passos,<br><em>grandes ideias.</em></h2><p>Tenha mais clareza sobre o que importa hoje.</p><button class="text-button" data-tool="agenda">Ver minha agenda <span>→</span></button></div><div class="sun-art" aria-hidden="true"><i></i><b>✦</b><strong>09</strong></div></section><div class="section-heading"><div><p class="eyebrow">TUDO NO SEU RITMO</p><h2>Meu Espaço</h2></div><button class="view-all" data-nav="favorites">Ver favoritos <span>→</span></button></div><section class="tool-grid">${tools.map(toolCard).join('')}</section>` }
-function itemList(type: string) { const items = getItems().filter((item) => item.type === type); if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`; return `<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>` }
+function itemList(type: string) {
+  const items = getItems().filter((item) => item.type === type)
+  if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
+  if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
+  return `<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
+}
 
 function innerView() {
   const tool = activeTool ?? tools.find((item) => item.id === activeNav)
@@ -52,7 +56,34 @@ function showForm(type: string) {
   const root = document.querySelector<HTMLDivElement>('#modal-root')!
   root.innerHTML = `<div class="modal-backdrop" data-close="true"><section class="add-sheet" role="dialog" aria-modal="true"><button class="close-modal" data-close="true">×</button><p class="eyebrow">${tool.icon} NOVO ITEM</p><h2>Adicionar em ${tool.label}</h2><form class="feature-form" id="item-form" data-type="${type}">${formFields(type)}<button class="primary-button" type="submit">Salvar item</button></form></section></div>`
   root.querySelectorAll<HTMLElement>('[data-close]').forEach((element) => element.addEventListener('click', (event) => { if (event.target === element || element.classList.contains('close-modal')) root.innerHTML = '' }))
-  root.querySelector<HTMLFormElement>('#item-form')?.addEventListener('submit', (event) => { event.preventDefault(); const data = new FormData(event.currentTarget as HTMLFormElement); let title = String(data.get('title') ?? 'Item'); let detail = String(data.get('detail') ?? ''); if (type === 'calculadoras') { const first = Number(data.get('first')); const second = Number(data.get('second')); const operation = String(data.get('operation')); const result = operation === '+' ? first + second : operation === '-' ? first - second : operation === '*' ? first * second : second === 0 ? NaN : first / second; title = `Resultado: ${result}`; detail = `${first} ${operation} ${second}` } if (type === 'fotos' || type === 'arquivos') title = (data.get('file') as File)?.name || 'Arquivo'; addItem(type, title, detail || 'Sem detalhes'); root.innerHTML = ''; render() })
+  root.querySelector<HTMLFormElement>('#item-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget as HTMLFormElement)
+    let title = String(data.get('title') ?? 'Item')
+    let detail = String(data.get('detail') ?? '')
+    let image: string | undefined
+    if (type === 'calculadoras') { const first = Number(data.get('first')); const second = Number(data.get('second')); const operation = String(data.get('operation')); const result = operation === '+' ? first + second : operation === '-' ? first - second : operation === '*' ? first * second : second === 0 ? NaN : first / second; title = `Resultado: ${result}`; detail = `${first} ${operation} ${second}` }
+    if (type === 'fotos' || type === 'arquivos') {
+      const file = data.get('file') as File
+      title = file?.name || 'Arquivo'
+      if (type === 'fotos' && file?.type.startsWith('image/')) image = await fileToDataUrl(file)
+    }
+    const items = getItems()
+    items.unshift({ id: crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: new Date().toLocaleDateString('pt-BR'), image })
+    saveItems(items)
+    root.innerHTML = ''
+    render()
+  })
+}
+
+function fileToDataUrl(file: File) { return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file) }) }
+
+function showPhoto(id: string) {
+  const item = getItems().find((savedItem) => savedItem.id === id)
+  if (!item?.image) return
+  const root = document.querySelector<HTMLDivElement>('#modal-root')!
+  root.innerHTML = `<div class="photo-lightbox" data-close-photo="true"><button class="close-modal" data-close-photo="true">×</button><img src="${item.image}" alt="${escapeHtml(item.title)}"><p>${escapeHtml(item.title)}</p></div>`
+  root.querySelectorAll<HTMLElement>('[data-close-photo]').forEach((element) => element.addEventListener('click', (event) => { if (event.target === element || element.classList.contains('close-modal')) root.innerHTML = '' }))
 }
 function showAddModal() {
   const root = document.querySelector<HTMLDivElement>('#modal-root')!
@@ -67,7 +98,8 @@ function bindEvents() {
   document.querySelectorAll<HTMLElement>('[data-nav]').forEach((element) => element.addEventListener('click', () => { const nav = element.dataset.nav!; if (nav === 'add') return showAddModal(); activeTool = null; activeNav = nav; render() }))
   document.querySelectorAll<HTMLElement>('[data-add-tool]').forEach((element) => element.addEventListener('click', () => showForm(element.dataset.addTool!)))
   document.querySelectorAll<HTMLElement>('[data-delete]').forEach((element) => element.addEventListener('click', () => deleteItem(element.dataset.delete!)))
-  document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank') })
+  document.querySelectorAll<HTMLElement>('[data-photo]').forEach((element) => element.addEventListener('click', () => showPhoto(element.dataset.photo!)))
+  document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer') })
   document.querySelector<HTMLFormElement>('#settings-form')?.addEventListener('submit', (event) => { event.preventDefault(); const oldKey = storageKey(); const value = document.querySelector<HTMLInputElement>('#settings-name')!.value.trim(); if (!value) return; const oldItems = localStorage.getItem(oldKey); userName = value; localStorage.setItem('hazuni-user-name', userName); if (oldItems) localStorage.setItem(storageKey(), oldItems); render() })
 }
 render()
