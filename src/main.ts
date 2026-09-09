@@ -23,9 +23,28 @@ function checkAlarms() {
     if (localStorage.getItem(notificationKey)) return
     localStorage.setItem(notificationKey, 'shown')
     if ('Notification' in window && Notification.permission === 'granted') new Notification(`Alarme: ${item.title}`, { body: `Está na hora: ${item.detail}`, tag: item.id })
+    showInAppAlarm(item)
   })
 }
 setInterval(checkAlarms, 10000)
+
+function showInAppAlarm(item: Item) {
+  const root = document.querySelector<HTMLDivElement>('#modal-root')
+  if (!root) return
+  root.innerHTML = `<div class="alarm-alert" data-dismiss-alarm="true"><section class="alarm-alert-card"><div class="alarm-bell">⏰</div><p class="eyebrow">HORA DO ALARME</p><h2>${escapeHtml(item.title)}</h2><p>Está na hora do seu lembrete.</p><button class="primary-button" data-dismiss-alarm="true">Entendi</button></section></div>`
+  root.querySelectorAll<HTMLElement>('[data-dismiss-alarm]').forEach((element) => element.addEventListener('click', () => { root.innerHTML = '' }))
+  try {
+    const audioContext = new AudioContext()
+    const oscillator = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+    oscillator.frequency.value = 880
+    oscillator.connect(gain)
+    gain.connect(audioContext.destination)
+    gain.gain.value = 0.12
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.8)
+  } catch { }
+}
 
 function toolCard(tool: Tool) {
   const count = getItems().filter((item) => item.type === tool.id).length
