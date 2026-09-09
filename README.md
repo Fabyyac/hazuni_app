@@ -4,6 +4,8 @@ O **Hazuni App** é um aplicativo moderno e simples criado para reunir pequenas 
 
 A tela principal, chamada **Meu Espaço**, organiza os recursos em cartões intuitivos para que o usuário encontre rapidamente o que precisa.
 
+No primeiro acesso, o usuário informa seu nome para personalizar o espaço. Essa identificação fica salva apenas no navegador atual. O avatar no canto superior permite sair e voltar à tela inicial de identificação.
+
 ## Recursos
 
 - **Agenda**: organização de compromissos.
@@ -37,6 +39,7 @@ O Hazuni App foi pensado para oferecer:
 - Cartões organizados para acesso rápido.
 - Estrutura modular para adicionar novas ferramentas no futuro.
 - Estados de navegação para abrir cada ferramenta dentro do aplicativo.
+- Tela de primeiro acesso com personalização do nome.
 
 ## Tecnologias
 

@@ -4,6 +4,11 @@ import { quickActions, tools, type Tool } from './tools'
 const app = document.querySelector<HTMLDivElement>('#app')!
 let activeTool: Tool | null = null
 let activeNav = 'home'
+let userName = localStorage.getItem('hazuni-user-name') ?? ''
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
+}
 
 function toolCard(tool: Tool) {
   return `<button class="tool-card" data-tool="${tool.id}" aria-label="Abrir ${tool.label}">
@@ -15,11 +20,17 @@ function toolCard(tool: Tool) {
 }
 
 function render() {
+  if (!userName) {
+    app.innerHTML = loginView()
+    bindEvents()
+    return
+  }
+
   const isHome = activeNav === 'home' && !activeTool
   app.innerHTML = `<div class="app-shell">
     <header class="topbar">
       <div class="brand-mark"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></div>
-      <button class="avatar" aria-label="Abrir perfil">MC</button>
+      <button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button>
     </header>
     <main class="main-content">
       ${isHome ? homeView() : innerView()}
@@ -30,8 +41,12 @@ function render() {
   bindEvents()
 }
 
+function loginView() {
+  return `<main class="login-page"><div class="login-brand"><span>H</span><strong>HAZUNI</strong></div><section class="login-card"><div class="login-mark">✦</div><p class="eyebrow">SEU ESPAÇO PESSOAL</p><h1>Como podemos<br><em>te chamar?</em></h1><p class="login-copy">Crie seu espaço no Hazuni e deixe tudo do seu jeito.</p><form id="login-form"><label for="user-name">Seu nome</label><input id="user-name" name="user-name" type="text" placeholder="Digite seu nome" autocomplete="name" maxlength="40" required><button class="primary-button" type="submit">Entrar no meu espaço <span>→</span></button></form><small class="login-note">Seu nome fica salvo apenas neste navegador.</small></section><div class="login-decoration" aria-hidden="true">✦</div></main>`
+}
+
 function homeView() {
-  return `<section class="welcome reveal"><p class="eyebrow">QUARTA-FEIRA, 09 DE SETEMBRO</p><h1>Bom dia, Marina <span>✦</span></h1><p class="subtitle">Tudo o que você precisa, em um só lugar.</p></section>
+  return `<section class="welcome reveal"><p class="eyebrow">QUARTA-FEIRA, 09 DE SETEMBRO</p><h1>Bom dia, ${userName} <span>✦</span></h1><p class="subtitle">Tudo o que você precisa, em um só lugar.</p></section>
     <section class="spotlight reveal-delay"><div><span class="spotlight-label">SEU DIA EM FOCO</span><h2>Pequenos passos,<br><em>grandes ideias.</em></h2><p>Tenha mais clareza sobre o que importa hoje.</p><button class="text-button" data-tool="agenda">Ver minha agenda <span>→</span></button></div><div class="sun-art" aria-hidden="true"><i></i><b>✦</b><strong>09</strong></div></section>
     <div class="section-heading"><div><p class="eyebrow">TUDO NO SEU RITMO</p><h2>Meu Espaço</h2></div><button class="view-all" data-nav="favorites">Ver favoritos <span>→</span></button></div>
     <section class="tool-grid">${tools.map(toolCard).join('')}</section>`
@@ -55,6 +70,21 @@ function showAddModal() {
 }
 
 function bindEvents() {
+  document.querySelector<HTMLFormElement>('#login-form')?.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const input = document.querySelector<HTMLInputElement>('#user-name')!
+    userName = input.value.trim()
+    if (!userName) return
+    localStorage.setItem('hazuni-user-name', userName)
+    render()
+  })
+  document.querySelector<HTMLElement>('[data-logout]')?.addEventListener('click', () => {
+    localStorage.removeItem('hazuni-user-name')
+    userName = ''
+    activeTool = null
+    activeNav = 'home'
+    render()
+  })
   document.querySelectorAll<HTMLElement>('[data-tool]').forEach((element) => element.addEventListener('click', () => { activeTool = tools.find((tool) => tool.id === element.dataset.tool) ?? null; activeNav = activeTool?.id ?? 'home'; render() }))
   document.querySelectorAll<HTMLElement>('[data-nav]').forEach((element) => element.addEventListener('click', () => { const nav = element.dataset.nav!; if (nav === 'add') return showAddModal(); activeTool = null; activeNav = nav; render() }))
   document.querySelectorAll<HTMLElement>('[data-add]').forEach((element) => element.addEventListener('click', showAddModal))
