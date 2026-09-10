@@ -55,7 +55,7 @@ function toolCard(tool: Tool) {
 function render() {
   if (!userName) { app.innerHTML = loginView(); bindEvents(); return }
   const isHome = activeNav === 'home' && !activeTool
-  app.innerHTML = `<div class="app-shell"><header class="topbar"><button class="brand-mark" data-home="true" type="button" aria-label="Voltar para Meu Espaço"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></button><button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button></header><main class="main-content">${isHome ? homeView() : innerView()}</main>${bottomNav()}<div id="modal-root"></div></div>`
+  app.innerHTML = `<div class="app-shell"><header class="topbar"><button class="brand-mark" data-home="true" data-nav="home" type="button" aria-label="Voltar para Meu Espaço"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></button><button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button></header><main class="main-content">${isHome ? homeView() : innerView()}</main>${bottomNav()}<div id="modal-root"></div></div>`
   bindEvents()
 }
 
@@ -135,7 +135,7 @@ function showAddModal() {
 }
 function bindEvents() {
   document.querySelector<HTMLFormElement>('#login-form')?.addEventListener('submit', (event) => { event.preventDefault(); const input = document.querySelector<HTMLInputElement>('#user-name')!; userName = input.value.trim(); if (!userName) return; localStorage.setItem('hazuni-user-name', userName); render() })
-  document.querySelector<HTMLElement>('[data-home]')?.addEventListener('click', () => { activeTool = null; activeNav = 'home'; render() })
+  document.querySelector<HTMLElement>('[data-home]')?.addEventListener('click', goHome)
   document.querySelector<HTMLElement>('[data-logout]')?.addEventListener('click', () => { localStorage.removeItem('hazuni-user-name'); userName = ''; activeTool = null; activeNav = 'home'; render() })
   document.querySelectorAll<HTMLElement>('[data-tool]').forEach((element) => element.addEventListener('click', () => { activeTool = tools.find((tool) => tool.id === element.dataset.tool) ?? null; activeNav = activeTool?.id ?? 'home'; render() }))
   document.querySelectorAll<HTMLElement>('[data-nav]').forEach((element) => element.addEventListener('click', () => { const nav = element.dataset.nav!; if (nav === 'add') return showAddModal(); activeTool = null; activeNav = nav; render() }))
@@ -146,4 +146,5 @@ function bindEvents() {
   document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer') })
   document.querySelector<HTMLFormElement>('#settings-form')?.addEventListener('submit', (event) => { event.preventDefault(); const oldKey = storageKey(); const value = document.querySelector<HTMLInputElement>('#settings-name')!.value.trim(); if (!value) return; const oldItems = localStorage.getItem(oldKey); userName = value; localStorage.setItem('hazuni-user-name', userName); if (oldItems) localStorage.setItem(storageKey(), oldItems); render() })
 }
+function goHome() { activeTool = null; activeNav = 'home'; render() }
 render()
