@@ -48,13 +48,14 @@ function showInAppAlarm(item: Item) {
 
 function toolCard(tool: Tool) {
   const count = getItems().filter((item) => item.type === tool.id).length
-  return `<button class="tool-card" data-tool="${tool.id}" aria-label="Abrir ${tool.label}"><span class="tool-icon ${tool.color}">${tool.icon}</span><span class="tool-copy"><strong>${tool.label}</strong><small>${tool.description}</small></span>${count ? `<span class="tool-badge">${count} ${count === 1 ? 'item' : 'itens'}</span>` : tool.badge ? `<span class="tool-badge">${tool.badge}</span>` : ''}<span class="card-arrow">↗</span></button>`
+  const navigation = tool.id === 'pesquisar' ? 'data-nav="search"' : `data-tool="${tool.id}"`
+  return `<button class="tool-card" ${navigation} aria-label="Abrir ${tool.label}"><span class="tool-icon ${tool.color}">${tool.icon}</span><span class="tool-copy"><strong>${tool.label}</strong><small>${tool.description}</small></span>${count ? `<span class="tool-badge">${count} ${count === 1 ? 'item' : 'itens'}</span>` : tool.badge ? `<span class="tool-badge">${tool.badge}</span>` : ''}<span class="card-arrow">↗</span></button>`
 }
 
 function render() {
   if (!userName) { app.innerHTML = loginView(); bindEvents(); return }
   const isHome = activeNav === 'home' && !activeTool
-  app.innerHTML = `<div class="app-shell"><header class="topbar"><button class="brand-mark" data-nav="home" type="button" aria-label="Voltar para Meu Espaço"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></button><button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button></header><main class="main-content">${isHome ? homeView() : innerView()}</main>${bottomNav()}<div id="modal-root"></div></div>`
+  app.innerHTML = `<div class="app-shell"><header class="topbar"><button class="brand-mark" data-home="true" type="button" aria-label="Voltar para Meu Espaço"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></button><button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button></header><main class="main-content">${isHome ? homeView() : innerView()}</main>${bottomNav()}<div id="modal-root"></div></div>`
   bindEvents()
 }
 
@@ -70,9 +71,9 @@ function itemList(type: string) {
 }
 
 function innerView() {
+  if (activeNav === 'search') return `<section class="inner-hero"><p class="eyebrow">HAZUNI APP</p><h1>Pesquisar</h1><p>Encontre rapidamente o que precisa na internet.</p></section><form class="feature-form" id="search-form"><label for="search-query">O que você procura?</label><div class="search-input"><input id="search-query" required placeholder="Digite sua pesquisa"><button class="primary-button" type="submit">Pesquisar</button></div></form>`
   const tool = activeTool ?? tools.find((item) => item.id === activeNav)
   if (tool) return `<button class="back-button" data-nav="home">← Voltar para Meu Espaço</button><section class="inner-hero"><span class="tool-icon ${tool.color}">${tool.icon}</span><p class="eyebrow">FERRAMENTA HAZUNI</p><h1>${tool.label}</h1><p>${tool.description}.</p></section><div class="action-row"><button class="primary-button" data-add-tool="${tool.id}">＋ Adicionar</button></div>${itemList(tool.id)}`
-  if (activeNav === 'search') return `<section class="inner-hero"><p class="eyebrow">HAZUNI APP</p><h1>Pesquisar</h1><p>Encontre rapidamente o que precisa na internet.</p></section><form class="feature-form" id="search-form"><label for="search-query">O que você procura?</label><div class="search-input"><input id="search-query" required placeholder="Digite sua pesquisa"><button class="primary-button" type="submit">Pesquisar</button></div></form>`
   if (activeNav === 'favorites') return `<section class="inner-hero"><p class="eyebrow">SEUS ATALHOS</p><h1>Favoritos</h1><p>Acesse seus itens salvos rapidamente.</p></section><div class="favorite-grid">${tools.filter((tool) => getItems().some((item) => item.type === tool.id)).map(toolCard).join('') || '<div class="empty-state"><div>☆</div><h2>Seus favoritos aparecem aqui</h2><p>Adicione itens nas ferramentas para criar seus atalhos.</p></div>'}</div>`
   return `<section class="inner-hero"><p class="eyebrow">SEU PERFIL</p><h1>Configurações</h1><p>Personalize o seu espaço no Hazuni.</p></section><form class="feature-form" id="settings-form"><label for="settings-name">Seu nome</label><input id="settings-name" value="${escapeHtml(userName)}" required maxlength="40"><button class="primary-button" type="submit">Salvar alterações</button></form><button class="danger-button" data-logout="true">Sair do aparelho</button>`
 }
@@ -134,6 +135,7 @@ function showAddModal() {
 }
 function bindEvents() {
   document.querySelector<HTMLFormElement>('#login-form')?.addEventListener('submit', (event) => { event.preventDefault(); const input = document.querySelector<HTMLInputElement>('#user-name')!; userName = input.value.trim(); if (!userName) return; localStorage.setItem('hazuni-user-name', userName); render() })
+  document.querySelector<HTMLElement>('[data-home]')?.addEventListener('click', () => { activeTool = null; activeNav = 'home'; render() })
   document.querySelector<HTMLElement>('[data-logout]')?.addEventListener('click', () => { localStorage.removeItem('hazuni-user-name'); userName = ''; activeTool = null; activeNav = 'home'; render() })
   document.querySelectorAll<HTMLElement>('[data-tool]').forEach((element) => element.addEventListener('click', () => { activeTool = tools.find((tool) => tool.id === element.dataset.tool) ?? null; activeNav = activeTool?.id ?? 'home'; render() }))
   document.querySelectorAll<HTMLElement>('[data-nav]').forEach((element) => element.addEventListener('click', () => { const nav = element.dataset.nav!; if (nav === 'add') return showAddModal(); activeTool = null; activeNav = nav; render() }))
