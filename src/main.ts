@@ -143,7 +143,7 @@ function bindEvents() {
   document.querySelectorAll<HTMLElement>('[data-delete]').forEach((element) => element.addEventListener('click', () => deleteItem(element.dataset.delete!)))
   document.querySelectorAll<HTMLElement>('[data-photo]').forEach((element) => element.addEventListener('click', () => showPhoto(element.dataset.photo!)))
   document.querySelector<HTMLElement>('[data-notification-help]')?.addEventListener('click', requestNotifications)
-  document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer') })
+  document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.location.assign(`https://www.google.com/search?q=${encodeURIComponent(query)}`) })
   document.querySelector<HTMLFormElement>('#settings-form')?.addEventListener('submit', (event) => { event.preventDefault(); const oldKey = storageKey(); const value = document.querySelector<HTMLInputElement>('#settings-name')!.value.trim(); if (!value) return; const oldItems = localStorage.getItem(oldKey); userName = value; localStorage.setItem('hazuni-user-name', userName); if (oldItems) localStorage.setItem(storageKey(), oldItems); render() })
 }
 function goHome() { activeTool = null; activeNav = 'home'; render() }
