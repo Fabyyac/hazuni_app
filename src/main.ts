@@ -54,7 +54,7 @@ function toolCard(tool: Tool) {
 function render() {
   if (!userName) { app.innerHTML = loginView(); bindEvents(); return }
   const isHome = activeNav === 'home' && !activeTool
-  app.innerHTML = `<div class="app-shell"><header class="topbar"><div class="brand-mark"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></div><button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button></header><main class="main-content">${isHome ? homeView() : innerView()}</main>${bottomNav()}<div id="modal-root"></div></div>`
+  app.innerHTML = `<div class="app-shell"><header class="topbar"><button class="brand-mark" data-nav="home" type="button" aria-label="Voltar para Meu Espaço"><span>H</span><div><strong>HAZUNI</strong><small>seu espaço, do seu jeito</small></div></button><button class="avatar" data-logout="true" aria-label="Sair da conta">${initials(userName)}</button></header><main class="main-content">${isHome ? homeView() : innerView()}</main>${bottomNav()}<div id="modal-root"></div></div>`
   bindEvents()
 }
 
