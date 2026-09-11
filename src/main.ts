@@ -14,6 +14,11 @@ function getItems(): Item[] { return JSON.parse(localStorage.getItem(storageKey(
 function saveItems(items: Item[]) { localStorage.setItem(storageKey(), JSON.stringify(items)) }
 function deleteItem(id: string) { saveItems(getItems().filter((item) => item.id !== id)); render() }
 function editableType(type: string) { return type === 'agenda' || type === 'contas' || type === 'anotacoes' }
+function parseMoney(value: string) {
+  const cleaned = value.replace(/R\$|\s/g, '').trim()
+  const normalized = cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned
+  return Number(normalized) || 0
+}
 function calculateExpression(value: string) {
   const expression = value.replace(/R\$/gi, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '.').replace(/\s/g, '')
   if (!expression || !/^[\d.+*\-/()]+$/.test(expression)) return null
@@ -120,7 +125,9 @@ function itemList(type: string) {
   const items = getItems().filter((item) => item.type === type)
   if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
-  return `<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const accountInfo = type === 'contas' ? `${item.dueDate ? `<small class="account-description">Vencimento: ${formatDueDate(item.dueDate)}</small>` : ''}${item.accountObservation ? `<small class="account-description">${escapeHtml(item.accountObservation).replace(/\r?\n/g, '<br>')}</small>` : ''}` : ''; const metadata = type === 'contas' ? '' : detail; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong>${accountInfo}${metadata ? `<small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small>` : ''}</div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
+  const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
+  const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
+  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? formatMoney(parseMoney(item.detail)) : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const accountInfo = type === 'contas' ? `${item.dueDate ? `<small class="account-description">Vencimento: ${formatDueDate(item.dueDate)}</small>` : ''}${item.accountObservation ? `<small class="account-description">${escapeHtml(item.accountObservation).replace(/\r?\n/g, '<br>')}</small>` : ''}` : ''; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong>${accountInfo}<small>${detail}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
 }
 
 function calculatorView() {
@@ -140,7 +147,7 @@ function bottomNav() { const items = [['home', '⌂', 'Início'], ['search', '�
 function formFields(type: string) {
   if (type === 'fotos' || type === 'arquivos') return `<label>Escolha um arquivo<input name="file" type="file" required></label><label>Descrição<input name="detail" placeholder="Opcional"></label>`
   if (type === 'agenda') return `<label>Compromisso<input name="title" required placeholder="Ex.: Reunião de trabalho"></label><label>Data e horário<input name="detail" type="datetime-local" required></label><label class="checkbox-field"><input name="hasAlarm" type="checkbox"> Adicionar alarme</label><label data-alarm-time hidden>Horário do alarme<input name="alarmTime" type="time"></label>`
-  if (type === 'contas') return `<label>Descrição da conta<input name="title" required placeholder="Ex.: Conta de luz"></label><label>Data de vencimento<input name="dueDate" type="date" required></label><label>Observação<textarea name="accountObservation" rows="3" placeholder="Ex.: referente ao mês de setembro"></textarea></label>`
+  if (type === 'contas') return `<label>Descrição da conta<input name="title" required placeholder="Ex.: Conta de luz"></label><label>Valor<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="R$ 0,00"></label><label>Data de vencimento<input name="dueDate" type="date" required></label><label>Observação<textarea name="accountObservation" rows="3" placeholder="Ex.: referente ao mês de setembro"></textarea></label>`
   return `<label>Título<input name="title" required placeholder="Dê um nome para isso"></label><label>Detalhes<textarea name="detail" rows="4" placeholder="Escreva aqui..."></textarea></label>`
 }
 function showForm(type: string, itemId?: string) {
@@ -151,7 +158,7 @@ function showForm(type: string, itemId?: string) {
   if (existingItem) {
     root.querySelector<HTMLInputElement>('[name="title"]')?.setAttribute('value', existingItem.title)
     const detailField = root.querySelector<HTMLInputElement | HTMLTextAreaElement>('[name="detail"]')
-    if (detailField) detailField.value = existingItem.detail
+    if (detailField) detailField.value = type === 'contas' ? formatMoney(parseMoney(existingItem.detail)) : existingItem.detail
     const dueDateField = root.querySelector<HTMLInputElement>('[name="dueDate"]')
     if (dueDateField) dueDateField.value = existingItem.dueDate ?? ''
     const observationField = root.querySelector<HTMLTextAreaElement>('[name="accountObservation"]')
@@ -178,7 +185,7 @@ function showForm(type: string, itemId?: string) {
       title = file?.name || 'Arquivo'
       if (type === 'fotos' && file?.type.startsWith('image/')) image = await fileToDataUrl(file)
     }
-    if (type === 'contas') detail = ''
+    if (type === 'contas') detail = String(parseMoney(detail))
     const alarmTime = type === 'agenda' && data.get('hasAlarm') ? String(data.get('alarmTime') ?? '') : undefined
     if (alarmTime && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
