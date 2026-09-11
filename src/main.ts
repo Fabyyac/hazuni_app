@@ -13,6 +13,7 @@ function storageKey() { return `hazuni-items-${userName.toLowerCase()}` }
 function getItems(): Item[] { return JSON.parse(localStorage.getItem(storageKey()) ?? '[]') as Item[] }
 function saveItems(items: Item[]) { localStorage.setItem(storageKey(), JSON.stringify(items)) }
 function deleteItem(id: string) { saveItems(getItems().filter((item) => item.id !== id)); render() }
+function editableType(type: string) { return type === 'agenda' || type === 'contas' || type === 'anotacoes' }
 function parseMoney(value: string) {
   const cleaned = value.replace(/R\$|\s/g, '').trim()
   const normalized = cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned
@@ -79,7 +80,7 @@ function itemList(type: string) {
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
   const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
   const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
-  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? formatMoney(parseMoney(item.detail)) : escapeHtml(item.detail); const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>` }).join('')}</div>`
+  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? formatMoney(parseMoney(item.detail)) : escapeHtml(item.detail); const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
 }
 
 function innerView() {
@@ -96,10 +97,22 @@ function formFields(type: string) {
   if (type === 'contas') return `<label>Descrição<input name="title" required placeholder="Ex.: Mercado"></label><label>Valor em reais<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="R$ 0,00"></label>`
   return `<label>Título<input name="title" required placeholder="Dê um nome para isso"></label><label>Detalhes<textarea name="detail" rows="4" placeholder="Escreva aqui..."></textarea></label>`
 }
-function showForm(type: string) {
+function showForm(type: string, itemId?: string) {
   const tool = tools.find((item) => item.id === type); if (!tool) return
+  const existingItem = itemId ? getItems().find((item) => item.id === itemId && item.type === type) : undefined
   const root = document.querySelector<HTMLDivElement>('#modal-root')!
-  root.innerHTML = `<div class="modal-backdrop" data-close="true"><section class="add-sheet" role="dialog" aria-modal="true"><button class="close-modal" data-close="true">×</button><p class="eyebrow">${tool.icon} NOVO ITEM</p><h2>Adicionar em ${tool.label}</h2><form class="feature-form" id="item-form" data-type="${type}">${formFields(type)}<button class="primary-button" type="submit">Salvar item</button></form></section></div>`
+  root.innerHTML = `<div class="modal-backdrop" data-close="true"><section class="add-sheet" role="dialog" aria-modal="true"><button class="close-modal" data-close="true">×</button><p class="eyebrow">${tool.icon} ${existingItem ? 'EDITAR ITEM' : 'NOVO ITEM'}</p><h2>${existingItem ? `Editar em ${tool.label}` : `Adicionar em ${tool.label}`}</h2><form class="feature-form" id="item-form" data-type="${type}">${formFields(type)}<button class="primary-button" type="submit">${existingItem ? 'Salvar alterações' : 'Salvar item'}</button></form></section></div>`
+  if (existingItem) {
+    root.querySelector<HTMLInputElement>('[name="title"]')?.setAttribute('value', existingItem.title)
+    const detailField = root.querySelector<HTMLInputElement | HTMLTextAreaElement>('[name="detail"]')
+    if (detailField) detailField.value = type === 'contas' ? formatMoney(parseMoney(existingItem.detail)) : existingItem.detail
+    const alarmCheckbox = root.querySelector<HTMLInputElement>('[name="hasAlarm"]')
+    if (alarmCheckbox) alarmCheckbox.checked = Boolean(existingItem.alarmTime)
+    const alarmInput = root.querySelector<HTMLInputElement>('[name="alarmTime"]')
+    if (alarmInput) alarmInput.value = existingItem.alarmTime ?? ''
+    const alarmField = root.querySelector<HTMLElement>('[data-alarm-time]')
+    if (alarmField) alarmField.hidden = !existingItem.alarmTime
+  }
   root.querySelectorAll<HTMLElement>('[data-close]').forEach((element) => element.addEventListener('click', (event) => { if (event.target === element || element.classList.contains('close-modal')) root.innerHTML = '' }))
   root.querySelector<HTMLInputElement>('[data-money-input]')?.addEventListener('blur', (event) => { const input = event.currentTarget as HTMLInputElement; if (input.value.trim()) input.value = formatMoney(parseMoney(input.value)) })
   root.querySelector<HTMLInputElement>('[name="hasAlarm"]')?.addEventListener('change', (event) => { const checkbox = event.currentTarget as HTMLInputElement; const alarmField = root.querySelector<HTMLElement>('[data-alarm-time]'); if (alarmField) alarmField.hidden = !checkbox.checked })
@@ -118,7 +131,11 @@ function showForm(type: string) {
     const alarmTime = type === 'agenda' && data.get('hasAlarm') ? String(data.get('alarmTime') ?? '') : undefined
     if (alarmTime && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
-    items.unshift({ id: crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: new Date().toLocaleDateString('pt-BR'), image, alarmTime: alarmTime || undefined })
+    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined }
+    if (existingItem) {
+      const itemIndex = items.findIndex((item) => item.id === existingItem.id)
+      if (itemIndex >= 0) items[itemIndex] = updatedItem
+    } else items.unshift(updatedItem)
     saveItems(items)
     root.innerHTML = ''
     render()
@@ -153,6 +170,7 @@ function bindEvents() {
   document.querySelectorAll<HTMLElement>('[data-tool]').forEach((element) => element.addEventListener('click', () => { activeTool = tools.find((tool) => tool.id === element.dataset.tool) ?? null; activeNav = activeTool?.id ?? 'home'; render() }))
   document.querySelectorAll<HTMLElement>('[data-nav]').forEach((element) => element.addEventListener('click', () => { const nav = element.dataset.nav!; if (nav === 'add') return showAddModal(); activeTool = null; activeNav = nav; render() }))
   document.querySelectorAll<HTMLElement>('[data-add-tool]').forEach((element) => element.addEventListener('click', () => showForm(element.dataset.addTool!)))
+  document.querySelectorAll<HTMLElement>('[data-edit]').forEach((element) => element.addEventListener('click', () => { const item = getItems().find((savedItem) => savedItem.id === element.dataset.edit); if (item && editableType(item.type)) showForm(item.type, item.id) }))
   document.querySelectorAll<HTMLElement>('[data-delete]').forEach((element) => element.addEventListener('click', () => deleteItem(element.dataset.delete!)))
   document.querySelectorAll<HTMLElement>('[data-photo]').forEach((element) => element.addEventListener('click', () => showPhoto(element.dataset.photo!)))
   document.querySelector<HTMLElement>('[data-notification-help]')?.addEventListener('click', requestNotifications)
