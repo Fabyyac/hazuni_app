@@ -19,6 +19,11 @@ function parseMoney(value: string) {
   return Number(normalized) || 0
 }
 function formatMoney(value: number) { return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
+function formatScheduledDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
 
 function alarmNotificationKey(item: Item, date: Date) { return `hazuni-alarm-${item.id}-${date.toISOString().slice(0, 16)}` }
 function checkAlarms() {
@@ -74,7 +79,7 @@ function itemList(type: string) {
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
   const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
   const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
-  return `${totalView}<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${type === 'contas' ? formatMoney(parseMoney(item.detail)) : escapeHtml(item.detail)}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
+  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? formatMoney(parseMoney(item.detail)) : escapeHtml(item.detail); const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>` }).join('')}</div>`
 }
 
 function innerView() {
