@@ -1,7 +1,7 @@
 import './style.css'
 import { quickActions, tools, type Tool } from './tools'
 
-type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string; alarmTime?: string }
+type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string; alarmTime?: string; accountExpression?: string }
 const app = document.querySelector<HTMLDivElement>('#app')!
 let activeTool: Tool | null = null
 let activeNav = 'home'
@@ -18,6 +18,45 @@ function parseMoney(value: string) {
   const cleaned = value.replace(/R\$|\s/g, '').trim()
   const normalized = cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned
   return Number(normalized) || 0
+}
+function calculateExpression(value: string) {
+  const expression = value.replace(/R\$/gi, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '.').replace(/\s/g, '')
+  if (!expression || !/^[\d.+*\-/()]+$/.test(expression)) return null
+  const numbers: number[] = []
+  const operators: string[] = []
+  let position = 0
+  const applyOperation = () => {
+    const operator = operators.pop()
+    const right = numbers.pop()
+    const left = numbers.pop()
+    if (operator === undefined || left === undefined || right === undefined) return false
+    if (operator === '+') numbers.push(left + right)
+    if (operator === '-') numbers.push(left - right)
+    if (operator === '*') numbers.push(left * right)
+    if (operator === '/') numbers.push(right === 0 ? Number.NaN : left / right)
+    return true
+  }
+  const precedence = (operator: string) => operator === '+' || operator === '-' ? 1 : 2
+  while (position < expression.length) {
+    const numberMatch = expression.slice(position).match(/^(?:\d+(?:\.\d*)?|\.\d+)/)
+    if (numberMatch) { numbers.push(Number(numberMatch[0])); position += numberMatch[0].length; continue }
+    const character = expression[position]
+    if (character === '(') { operators.push(character); position++; continue }
+    if (character === ')') {
+      while (operators.length && operators[operators.length - 1] !== '(' && !applyOperation()) return null
+      if (operators.pop() !== '(') return null
+      position++
+      continue
+    }
+    if ('+-*/'.includes(character)) {
+      if (character === '-' && (position === 0 || expression[position - 1] === '(' || '+-*/'.includes(expression[position - 1]))) numbers.push(0)
+      while (operators.length && operators[operators.length - 1] !== '(' && precedence(operators[operators.length - 1]) >= precedence(character) && !applyOperation()) return null
+      operators.push(character); position++; continue
+    }
+    return null
+  }
+  while (operators.length) { if (operators[operators.length - 1] === '(' || !applyOperation()) return null }
+  return numbers.length === 1 && Number.isFinite(numbers[0]) ? numbers[0] : null
 }
 function formatMoney(value: number) { return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
 function formatScheduledDate(value: string) {
@@ -80,7 +119,7 @@ function itemList(type: string) {
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
   const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
   const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
-  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? formatMoney(parseMoney(item.detail)) : escapeHtml(item.detail); const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
+  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? `${item.accountExpression ? `${escapeHtml(item.accountExpression)} = ` : ''}${formatMoney(parseMoney(item.detail))}` : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
 }
 
 function innerView() {
@@ -94,7 +133,7 @@ function bottomNav() { const items = [['home', '⌂', 'Início'], ['search', '�
 function formFields(type: string) {
   if (type === 'fotos' || type === 'arquivos') return `<label>Escolha um arquivo<input name="file" type="file" required></label><label>Descrição<input name="detail" placeholder="Opcional"></label>`
   if (type === 'agenda') return `<label>Compromisso<input name="title" required placeholder="Ex.: Reunião de trabalho"></label><label>Data e horário<input name="detail" type="datetime-local" required></label><label class="checkbox-field"><input name="hasAlarm" type="checkbox"> Adicionar alarme</label><label data-alarm-time hidden>Horário do alarme<input name="alarmTime" type="time"></label>`
-  if (type === 'contas') return `<label>Descrição<input name="title" required placeholder="Ex.: Mercado"></label><label>Valor em reais<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="R$ 0,00"></label>`
+  if (type === 'contas') return `<label>Descrição<input name="title" required placeholder="Ex.: Mercado"></label><label>Valor ou operação<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="Ex.: 100 + 25 - 10 ou 12 × 3"></label>`
   return `<label>Título<input name="title" required placeholder="Dê um nome para isso"></label><label>Detalhes<textarea name="detail" rows="4" placeholder="Escreva aqui..."></textarea></label>`
 }
 function showForm(type: string, itemId?: string) {
@@ -105,7 +144,7 @@ function showForm(type: string, itemId?: string) {
   if (existingItem) {
     root.querySelector<HTMLInputElement>('[name="title"]')?.setAttribute('value', existingItem.title)
     const detailField = root.querySelector<HTMLInputElement | HTMLTextAreaElement>('[name="detail"]')
-    if (detailField) detailField.value = type === 'contas' ? formatMoney(parseMoney(existingItem.detail)) : existingItem.detail
+    if (detailField) detailField.value = type === 'contas' ? existingItem.accountExpression ?? formatMoney(parseMoney(existingItem.detail)) : existingItem.detail
     const alarmCheckbox = root.querySelector<HTMLInputElement>('[name="hasAlarm"]')
     if (alarmCheckbox) alarmCheckbox.checked = Boolean(existingItem.alarmTime)
     const alarmInput = root.querySelector<HTMLInputElement>('[name="alarmTime"]')
@@ -114,7 +153,6 @@ function showForm(type: string, itemId?: string) {
     if (alarmField) alarmField.hidden = !existingItem.alarmTime
   }
   root.querySelectorAll<HTMLElement>('[data-close]').forEach((element) => element.addEventListener('click', (event) => { if (event.target === element || element.classList.contains('close-modal')) root.innerHTML = '' }))
-  root.querySelector<HTMLInputElement>('[data-money-input]')?.addEventListener('blur', (event) => { const input = event.currentTarget as HTMLInputElement; if (input.value.trim()) input.value = formatMoney(parseMoney(input.value)) })
   root.querySelector<HTMLInputElement>('[name="hasAlarm"]')?.addEventListener('change', (event) => { const checkbox = event.currentTarget as HTMLInputElement; const alarmField = root.querySelector<HTMLElement>('[data-alarm-time]'); if (alarmField) alarmField.hidden = !checkbox.checked })
   root.querySelector<HTMLFormElement>('#item-form')?.addEventListener('submit', async (event) => {
     event.preventDefault()
@@ -127,11 +165,17 @@ function showForm(type: string, itemId?: string) {
       title = file?.name || 'Arquivo'
       if (type === 'fotos' && file?.type.startsWith('image/')) image = await fileToDataUrl(file)
     }
-    if (type === 'contas') detail = String(parseMoney(detail))
+    let accountExpression: string | undefined
+    if (type === 'contas') {
+      const result = calculateExpression(detail)
+      if (result === null) { window.alert('Digite uma operação válida usando números, +, -, × ou * e / .'); return }
+      accountExpression = detail.trim()
+      detail = String(result)
+    }
     const alarmTime = type === 'agenda' && data.get('hasAlarm') ? String(data.get('alarmTime') ?? '') : undefined
     if (alarmTime && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
-    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined }
+    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined, accountExpression: accountExpression || existingItem?.accountExpression }
     if (existingItem) {
       const itemIndex = items.findIndex((item) => item.id === existingItem.id)
       if (itemIndex >= 0) items[itemIndex] = updatedItem
