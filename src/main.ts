@@ -1,7 +1,7 @@
 import './style.css'
 import { quickActions, tools, type Tool } from './tools'
 
-type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string; alarmTime?: string; accountDescription?: string; accountOperation?: string; accountExpression?: string }
+type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string; alarmTime?: string; accountDescription?: string; accountOperation?: string; accountExpression?: string; dueDate?: string; accountObservation?: string }
 const app = document.querySelector<HTMLDivElement>('#app')!
 let activeTool: Tool | null = null
 let activeNav = 'home'
@@ -64,6 +64,10 @@ function formatScheduledDate(value: string) {
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
+function formatDueDate(value: string) {
+  const parts = value.split('-')
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value
+}
 
 function alarmNotificationKey(item: Item, date: Date) { return `hazuni-alarm-${item.id}-${date.toISOString().slice(0, 16)}` }
 function checkAlarms() {
@@ -119,7 +123,7 @@ function itemList(type: string) {
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
   const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
   const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
-  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? `${item.accountExpression ? `${escapeHtml(item.accountExpression)} = ` : ''}${formatMoney(parseMoney(item.detail))}` : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const accountDescription = type === 'contas' && item.accountDescription ? `<small class="account-description">${escapeHtml(item.accountDescription)}</small>` : ''; const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong>${accountDescription}<small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
+  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? `${item.accountExpression ? `${escapeHtml(item.accountExpression)} = ` : ''}${formatMoney(parseMoney(item.detail))}` : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const accountInfo = type === 'contas' ? `${item.dueDate ? `<small class="account-description">Vencimento: ${formatDueDate(item.dueDate)}</small>` : ''}${item.accountObservation ? `<small class="account-description">${escapeHtml(item.accountObservation).replace(/\r?\n/g, '<br>')}</small>` : ''}` : ''; const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong>${accountInfo}<small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
 }
 
 function innerView() {
@@ -133,7 +137,7 @@ function bottomNav() { const items = [['home', '⌂', 'Início'], ['search', '�
 function formFields(type: string) {
   if (type === 'fotos' || type === 'arquivos') return `<label>Escolha um arquivo<input name="file" type="file" required></label><label>Descrição<input name="detail" placeholder="Opcional"></label>`
   if (type === 'agenda') return `<label>Compromisso<input name="title" required placeholder="Ex.: Reunião de trabalho"></label><label>Data e horário<input name="detail" type="datetime-local" required></label><label class="checkbox-field"><input name="hasAlarm" type="checkbox"> Adicionar alarme</label><label data-alarm-time hidden>Horário do alarme<input name="alarmTime" type="time"></label>`
-  if (type === 'contas') return `<label>Título<input name="title" required placeholder="Ex.: Despesas do mês"></label><label>Descrição da conta<input name="accountDescription" placeholder="Ex.: Mercado e transporte"></label><label>Valor<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="R$ 0,00"></label><label>Operação (opcional)<input name="operation" inputmode="decimal" placeholder="Ex.: + 25 - 10 × 2 ÷ 3"></label>`
+  if (type === 'contas') return `<label>Descrição da conta<input name="title" required placeholder="Ex.: Conta de luz"></label><label>Valor ou operação<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="Ex.: 100 + 25 - 10 ou 12 × 3"></label><label>Data de vencimento<input name="dueDate" type="date" required></label><label>Observação<textarea name="accountObservation" rows="3" placeholder="Ex.: referente ao mês de setembro"></textarea></label>`
   return `<label>Título<input name="title" required placeholder="Dê um nome para isso"></label><label>Detalhes<textarea name="detail" rows="4" placeholder="Escreva aqui..."></textarea></label>`
 }
 function showForm(type: string, itemId?: string) {
@@ -145,10 +149,10 @@ function showForm(type: string, itemId?: string) {
     root.querySelector<HTMLInputElement>('[name="title"]')?.setAttribute('value', existingItem.title)
     const detailField = root.querySelector<HTMLInputElement | HTMLTextAreaElement>('[name="detail"]')
     if (detailField) detailField.value = type === 'contas' ? formatMoney(parseMoney(existingItem.detail)) : existingItem.detail
-    const accountDescriptionField = root.querySelector<HTMLInputElement>('[name="accountDescription"]')
-    if (accountDescriptionField) accountDescriptionField.value = existingItem.accountDescription ?? ''
-    const operationField = root.querySelector<HTMLInputElement>('[name="operation"]')
-    if (operationField) operationField.value = existingItem.accountOperation ?? ''
+    const dueDateField = root.querySelector<HTMLInputElement>('[name="dueDate"]')
+    if (dueDateField) dueDateField.value = existingItem.dueDate ?? ''
+    const observationField = root.querySelector<HTMLTextAreaElement>('[name="accountObservation"]')
+    if (observationField) observationField.value = existingItem.accountObservation ?? existingItem.accountDescription ?? ''
     const alarmCheckbox = root.querySelector<HTMLInputElement>('[name="hasAlarm"]')
     if (alarmCheckbox) alarmCheckbox.checked = Boolean(existingItem.alarmTime)
     const alarmInput = root.querySelector<HTMLInputElement>('[name="alarmTime"]')
@@ -163,8 +167,9 @@ function showForm(type: string, itemId?: string) {
     const data = new FormData(event.currentTarget as HTMLFormElement)
     let title = String(data.get('title') ?? 'Item')
     let detail = String(data.get('detail') ?? '')
-    const accountDescription = type === 'contas' ? String(data.get('accountDescription') ?? '').trim() : undefined
-    const operation = type === 'contas' ? String(data.get('operation') ?? '').trim() : ''
+    const dueDate = type === 'contas' ? String(data.get('dueDate') ?? '') : undefined
+    const accountObservation = type === 'contas' ? String(data.get('accountObservation') ?? '').trim() : undefined
+    const operation = ''
     let image: string | undefined
     if (type === 'fotos' || type === 'arquivos') {
       const file = data.get('file') as File
@@ -183,7 +188,7 @@ function showForm(type: string, itemId?: string) {
     const alarmTime = type === 'agenda' && data.get('hasAlarm') ? String(data.get('alarmTime') ?? '') : undefined
     if (alarmTime && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
-    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined, accountDescription: accountDescription || undefined, accountOperation: operation || undefined, accountExpression: accountExpression || undefined }
+    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined, accountDescription: undefined, accountOperation: undefined, accountExpression: accountExpression || undefined, dueDate: dueDate || undefined, accountObservation: accountObservation || undefined }
     if (existingItem) {
       const itemIndex = items.findIndex((item) => item.id === existingItem.id)
       if (itemIndex >= 0) items[itemIndex] = updatedItem
