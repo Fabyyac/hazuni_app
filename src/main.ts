@@ -14,11 +14,6 @@ function getItems(): Item[] { return JSON.parse(localStorage.getItem(storageKey(
 function saveItems(items: Item[]) { localStorage.setItem(storageKey(), JSON.stringify(items)) }
 function deleteItem(id: string) { saveItems(getItems().filter((item) => item.id !== id)); render() }
 function editableType(type: string) { return type === 'agenda' || type === 'contas' || type === 'anotacoes' }
-function parseMoney(value: string) {
-  const cleaned = value.replace(/R\$|\s/g, '').trim()
-  const normalized = cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned
-  return Number(normalized) || 0
-}
 function calculateExpression(value: string) {
   const expression = value.replace(/R\$/gi, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/,/g, '.').replace(/\s/g, '')
   if (!expression || !/^[\d.+*\-/()]+$/.test(expression)) return null
@@ -68,6 +63,10 @@ function formatDueDate(value: string) {
   const parts = value.split('-')
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value
 }
+type Calculation = { id: string; expression: string; result: number }
+function calculatorKey() { return `hazuni-calculator-${userName.toLowerCase()}` }
+function getCalculations(): Calculation[] { return JSON.parse(localStorage.getItem(calculatorKey()) ?? '[]') as Calculation[] }
+function saveCalculations(calculations: Calculation[]) { localStorage.setItem(calculatorKey(), JSON.stringify(calculations)) }
 
 function alarmNotificationKey(item: Item, date: Date) { return `hazuni-alarm-${item.id}-${date.toISOString().slice(0, 16)}` }
 function checkAlarms() {
@@ -120,15 +119,19 @@ function homeView() { return `<section class="welcome reveal"><p class="eyebrow"
 function itemList(type: string) {
   const items = getItems().filter((item) => item.type === type)
   if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
-  if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
-  const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
-  const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
-  return `${totalView}<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'contas' ? `${item.accountExpression ? `${escapeHtml(item.accountExpression)} = ` : ''}${formatMoney(parseMoney(item.detail))}` : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const accountInfo = type === 'contas' ? `${item.dueDate ? `<small class="account-description">Vencimento: ${formatDueDate(item.dueDate)}</small>` : ''}${item.accountObservation ? `<small class="account-description">${escapeHtml(item.accountObservation).replace(/\r?\n/g, '<br>')}</small>` : ''}` : ''; const metadata = type === 'agenda' ? detail : `${detail} · ${item.createdAt}`; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong>${accountInfo}<small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small></div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
+  if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
+  return `<div class="item-list">${items.map((item) => { const detail = type === 'agenda' ? formatScheduledDate(item.detail) : type === 'anotacoes' ? escapeHtml(item.detail).replace(/\r?\n/g, '<br>') : escapeHtml(item.detail); const accountInfo = type === 'contas' ? `${item.dueDate ? `<small class="account-description">Vencimento: ${formatDueDate(item.dueDate)}</small>` : ''}${item.accountObservation ? `<small class="account-description">${escapeHtml(item.accountObservation).replace(/\r?\n/g, '<br>')}</small>` : ''}` : ''; const metadata = type === 'contas' ? '' : detail; const editButton = editableType(type) ? `<button class="edit-item" data-edit="${item.id}" aria-label="Editar ${escapeHtml(item.title)}">✎</button>` : ''; return `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong>${accountInfo}${metadata ? `<small>${metadata}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''}</small>` : ''}</div><div class="item-actions">${editButton}<button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>` }).join('')}</div>`
+}
+
+function calculatorView() {
+  const calculations = getCalculations()
+  return `<section class="calculator-panel"><label for="calculator-input">Digite uma conta</label><div class="calculator-input"><input id="calculator-input" inputmode="decimal" autocomplete="off" placeholder="Ex.: 25 + 10 × 2"><button class="primary-button" id="calculate-button" type="button">Calcular</button></div><p id="calculator-result" class="calculator-result" aria-live="polite"></p><div class="calculator-history"><div class="section-heading"><h2>Histórico salvo</h2><button class="view-all" id="clear-calculations" type="button">Limpar</button></div>${calculations.length ? calculations.map((calculation) => `<div class="calculation-row"><span>${escapeHtml(calculation.expression)}</span><strong>${formatMoney(calculation.result)}</strong></div>`).join('') : '<p class="calculator-empty">Seus cálculos aparecerão aqui.</p>'}</div></section>`
 }
 
 function innerView() {
   if (activeNav === 'search') return `<section class="inner-hero"><p class="eyebrow">HAZUNI APP</p><h1>Pesquisar</h1><p>Encontre rapidamente o que precisa na internet.</p></section><form class="feature-form" id="search-form"><label for="search-query">O que você procura?</label><div class="search-input"><input id="search-query" required placeholder="Digite sua pesquisa"><button class="primary-button" type="submit">Pesquisar</button></div></form>`
   const tool = activeTool ?? tools.find((item) => item.id === activeNav)
+  if (activeNav === 'calculadora') return `<button class="back-button" data-nav="home">← Voltar para Meu Espaço</button><section class="inner-hero"><span class="tool-icon yellow">🧮</span><p class="eyebrow">FERRAMENTA HAZUNI</p><h1>Calculadora</h1><p>Faça cálculos e guarde seus resultados.</p></section>${calculatorView()}`
   if (tool) return `<button class="back-button" data-nav="home">← Voltar para Meu Espaço</button><section class="inner-hero"><span class="tool-icon ${tool.color}">${tool.icon}</span><p class="eyebrow">FERRAMENTA HAZUNI</p><h1>${tool.label}</h1><p>${tool.description}.</p></section><div class="action-row"><button class="primary-button" data-add-tool="${tool.id}">＋ Adicionar</button></div>${itemList(tool.id)}`
   if (activeNav === 'favorites') return `<section class="inner-hero"><p class="eyebrow">SEUS ATALHOS</p><h1>Favoritos</h1><p>Acesse seus itens salvos rapidamente.</p></section><div class="favorite-grid">${tools.filter((tool) => getItems().some((item) => item.type === tool.id)).map(toolCard).join('') || '<div class="empty-state"><div>☆</div><h2>Seus favoritos aparecem aqui</h2><p>Adicione itens nas ferramentas para criar seus atalhos.</p></div>'}</div>`
   return `<section class="inner-hero"><p class="eyebrow">SEU PERFIL</p><h1>Configurações</h1><p>Personalize o seu espaço no Hazuni.</p></section><form class="feature-form" id="settings-form"><label for="settings-name">Seu nome</label><input id="settings-name" value="${escapeHtml(userName)}" required maxlength="40"><button class="primary-button" type="submit">Salvar alterações</button></form><button class="danger-button" data-logout="true">Sair do aparelho</button>`
@@ -137,7 +140,7 @@ function bottomNav() { const items = [['home', '⌂', 'Início'], ['search', '�
 function formFields(type: string) {
   if (type === 'fotos' || type === 'arquivos') return `<label>Escolha um arquivo<input name="file" type="file" required></label><label>Descrição<input name="detail" placeholder="Opcional"></label>`
   if (type === 'agenda') return `<label>Compromisso<input name="title" required placeholder="Ex.: Reunião de trabalho"></label><label>Data e horário<input name="detail" type="datetime-local" required></label><label class="checkbox-field"><input name="hasAlarm" type="checkbox"> Adicionar alarme</label><label data-alarm-time hidden>Horário do alarme<input name="alarmTime" type="time"></label>`
-  if (type === 'contas') return `<label>Descrição da conta<input name="title" required placeholder="Ex.: Conta de luz"></label><label>Valor ou operação<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="Ex.: 100 + 25 - 10 ou 12 × 3"></label><label>Data de vencimento<input name="dueDate" type="date" required></label><label>Observação<textarea name="accountObservation" rows="3" placeholder="Ex.: referente ao mês de setembro"></textarea></label>`
+  if (type === 'contas') return `<label>Descrição da conta<input name="title" required placeholder="Ex.: Conta de luz"></label><label>Data de vencimento<input name="dueDate" type="date" required></label><label>Observação<textarea name="accountObservation" rows="3" placeholder="Ex.: referente ao mês de setembro"></textarea></label>`
   return `<label>Título<input name="title" required placeholder="Dê um nome para isso"></label><label>Detalhes<textarea name="detail" rows="4" placeholder="Escreva aqui..."></textarea></label>`
 }
 function showForm(type: string, itemId?: string) {
@@ -148,7 +151,7 @@ function showForm(type: string, itemId?: string) {
   if (existingItem) {
     root.querySelector<HTMLInputElement>('[name="title"]')?.setAttribute('value', existingItem.title)
     const detailField = root.querySelector<HTMLInputElement | HTMLTextAreaElement>('[name="detail"]')
-    if (detailField) detailField.value = type === 'contas' ? formatMoney(parseMoney(existingItem.detail)) : existingItem.detail
+    if (detailField) detailField.value = existingItem.detail
     const dueDateField = root.querySelector<HTMLInputElement>('[name="dueDate"]')
     if (dueDateField) dueDateField.value = existingItem.dueDate ?? ''
     const observationField = root.querySelector<HTMLTextAreaElement>('[name="accountObservation"]')
@@ -169,26 +172,17 @@ function showForm(type: string, itemId?: string) {
     let detail = String(data.get('detail') ?? '')
     const dueDate = type === 'contas' ? String(data.get('dueDate') ?? '') : undefined
     const accountObservation = type === 'contas' ? String(data.get('accountObservation') ?? '').trim() : undefined
-    const operation = ''
     let image: string | undefined
     if (type === 'fotos' || type === 'arquivos') {
       const file = data.get('file') as File
       title = file?.name || 'Arquivo'
       if (type === 'fotos' && file?.type.startsWith('image/')) image = await fileToDataUrl(file)
     }
-    let accountExpression: string | undefined
-    if (type === 'contas') {
-      const value = parseMoney(detail)
-      const expression = `${value}${operation}`
-      const result = operation ? calculateExpression(expression) : value
-      if (result === null) { window.alert('Digite uma operação válida usando números, +, -, × ou * e / .'); return }
-      accountExpression = operation ? `${formatMoney(value)} ${operation}` : undefined
-      detail = String(result)
-    }
+    if (type === 'contas') detail = ''
     const alarmTime = type === 'agenda' && data.get('hasAlarm') ? String(data.get('alarmTime') ?? '') : undefined
     if (alarmTime && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
-    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined, accountDescription: undefined, accountOperation: undefined, accountExpression: accountExpression || undefined, dueDate: dueDate || undefined, accountObservation: accountObservation || undefined }
+    const updatedItem = { id: existingItem?.id ?? crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: existingItem?.createdAt ?? new Date().toLocaleDateString('pt-BR'), image: existingItem?.image ?? image, alarmTime: alarmTime || undefined, accountDescription: undefined, accountOperation: undefined, accountExpression: undefined, dueDate: dueDate || undefined, accountObservation: accountObservation || undefined }
     if (existingItem) {
       const itemIndex = items.findIndex((item) => item.id === existingItem.id)
       if (itemIndex >= 0) items[itemIndex] = updatedItem
@@ -229,6 +223,19 @@ function bindEvents() {
   document.querySelectorAll<HTMLElement>('[data-add-tool]').forEach((element) => element.addEventListener('click', () => showForm(element.dataset.addTool!)))
   document.querySelectorAll<HTMLElement>('[data-edit]').forEach((element) => element.addEventListener('click', () => { const item = getItems().find((savedItem) => savedItem.id === element.dataset.edit); if (item && editableType(item.type)) showForm(item.type, item.id) }))
   document.querySelectorAll<HTMLElement>('[data-delete]').forEach((element) => element.addEventListener('click', () => deleteItem(element.dataset.delete!)))
+  document.querySelector<HTMLButtonElement>('#calculate-button')?.addEventListener('click', () => {
+    const input = document.querySelector<HTMLInputElement>('#calculator-input')
+    const resultView = document.querySelector<HTMLElement>('#calculator-result')
+    if (!input || !resultView) return
+    const result = calculateExpression(input.value)
+    if (result === null) { resultView.textContent = 'Digite uma conta válida.'; return }
+    const calculations = getCalculations()
+    calculations.unshift({ id: crypto.randomUUID(), expression: input.value.trim(), result })
+    saveCalculations(calculations)
+    resultView.textContent = `Resultado: ${formatMoney(result)}`
+    render()
+  })
+  document.querySelector<HTMLButtonElement>('#clear-calculations')?.addEventListener('click', () => { saveCalculations([]); render() })
   document.querySelectorAll<HTMLElement>('[data-photo]').forEach((element) => element.addEventListener('click', () => showPhoto(element.dataset.photo!)))
   document.querySelector<HTMLElement>('[data-notification-help]')?.addEventListener('click', requestNotifications)
   document.querySelector<HTMLFormElement>('#search-form')?.addEventListener('submit', (event) => { event.preventDefault(); const query = document.querySelector<HTMLInputElement>('#search-query')!.value.trim(); if (query) window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer') })
