@@ -1,7 +1,7 @@
 import './style.css'
 import { quickActions, tools, type Tool } from './tools'
 
-type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string }
+type Item = { id: string; type: string; title: string; detail: string; createdAt: string; image?: string; alarmTime?: string }
 const app = document.querySelector<HTMLDivElement>('#app')!
 let activeTool: Tool | null = null
 let activeNav = 'home'
@@ -13,12 +13,19 @@ function storageKey() { return `hazuni-items-${userName.toLowerCase()}` }
 function getItems(): Item[] { return JSON.parse(localStorage.getItem(storageKey()) ?? '[]') as Item[] }
 function saveItems(items: Item[]) { localStorage.setItem(storageKey(), JSON.stringify(items)) }
 function deleteItem(id: string) { saveItems(getItems().filter((item) => item.id !== id)); render() }
+function parseMoney(value: string) {
+  const cleaned = value.replace(/R\$|\s/g, '').trim()
+  const normalized = cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned
+  return Number(normalized) || 0
+}
+function formatMoney(value: number) { return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) }
 
-function alarmNotificationKey(item: Item, date: Date) { return `hazuni-alarm-${item.id}-${date.toISOString().slice(0, 10)}` }
+function alarmNotificationKey(item: Item, date: Date) { return `hazuni-alarm-${item.id}-${date.toISOString().slice(0, 16)}` }
 function checkAlarms() {
   const now = new Date()
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  getItems().filter((item) => item.type === 'alarmes' && item.detail === currentTime).forEach((item) => {
+  const currentDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  getItems().filter((item) => item.type === 'agenda' && item.alarmTime === currentTime && item.detail.slice(0, 10) === currentDate).forEach((item) => {
     const notificationKey = alarmNotificationKey(item, now)
     if (localStorage.getItem(notificationKey)) return
     localStorage.setItem(notificationKey, 'shown')
@@ -65,9 +72,9 @@ function itemList(type: string) {
   const items = getItems().filter((item) => item.type === type)
   if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
   if (type === 'fotos') return `<div class="photo-grid">${items.map((item) => `<article class="photo-item"><button class="photo-preview" data-photo="${item.id}" aria-label="Abrir ${escapeHtml(item.title)} em tamanho maior"><img src="${item.image ?? ''}" alt="${escapeHtml(item.title)}"></button><div class="photo-meta"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></div></article>`).join('')}</div>`
-  const alarmPermission = 'Notification' in window ? Notification.permission : 'unsupported'
-  const alarmStatus = alarmPermission === 'granted' ? 'notificação ativada' : alarmPermission === 'denied' ? 'notificação bloqueada nas configurações do navegador' : 'notificação ainda não autorizada'
-  return `${type === 'alarmes' && alarmPermission !== 'granted' ? `<div class="permission-help"><strong>Ative as notificações para receber seus alarmes</strong><small>Toque no cadeado ou no ícone de configurações ao lado do endereço do Hazuni e permita as notificações. Depois, recarregue esta página.</small><button class="primary-button" data-notification-help="true">Tentar ativar notificações</button></div>` : ''}<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}${type === 'alarmes' ? ` · ${alarmStatus}` : ''} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
+  const total = type === 'contas' ? items.reduce((sum, item) => sum + parseMoney(item.detail), 0) : 0
+  const totalView = type === 'contas' ? `<div class="accounts-total"><span>Total das contas</span><strong>${formatMoney(total)}</strong></div>` : ''
+  return `${totalView}<div class="item-list">${items.map((item) => `<article class="saved-item"><div><strong>${escapeHtml(item.title)}</strong><small>${type === 'contas' ? formatMoney(parseMoney(item.detail)) : escapeHtml(item.detail)}${item.alarmTime ? ` · alarme às ${item.alarmTime}` : ''} · ${item.createdAt}</small></div><button class="delete-item" data-delete="${item.id}" aria-label="Excluir ${escapeHtml(item.title)}">×</button></article>`).join('')}</div>`
 }
 
 function innerView() {
@@ -79,11 +86,9 @@ function innerView() {
 }
 function bottomNav() { const items = [['home', '⌂', 'Início'], ['search', '⌕', 'Pesquisar'], ['add', '+', 'Adicionar'], ['favorites', '☆', 'Favoritos'], ['settings', '⚙', 'Configurações']]; return `<nav class="bottom-nav">${items.map(([id, icon, label]) => `<button class="nav-item ${activeNav === id ? 'active' : ''} ${id === 'add' ? 'add-item' : ''}" data-nav="${id}"><span>${icon}</span><small>${label}</small></button>`).join('')}</nav>` }
 function formFields(type: string) {
-  if (type === 'calculadoras') return `<label>Primeiro número<input name="first" type="number" step="any" required></label><label>Operação<select name="operation"><option value="+">Somar</option><option value="-">Subtrair</option><option value="*">Multiplicar</option><option value="/">Dividir</option></select></label><label>Segundo número<input name="second" type="number" step="any" required></label>`
   if (type === 'fotos' || type === 'arquivos') return `<label>Escolha um arquivo<input name="file" type="file" required></label><label>Descrição<input name="detail" placeholder="Opcional"></label>`
-  if (type === 'agenda') return `<label>Compromisso<input name="title" required placeholder="Ex.: Reunião de trabalho"></label><label>Data e horário<input name="detail" type="datetime-local" required></label>`
-  if (type === 'alarmes') return `<label>Nome do alarme<input name="title" required placeholder="Ex.: Tomar remédio"></label><label>Horário<input name="detail" type="time" required></label>`
-  if (type === 'contas') return `<label>Descrição<input name="title" required placeholder="Ex.: Mercado"></label><label>Valor<input name="detail" type="number" step="0.01" required placeholder="0,00"></label>`
+  if (type === 'agenda') return `<label>Compromisso<input name="title" required placeholder="Ex.: Reunião de trabalho"></label><label>Data e horário<input name="detail" type="datetime-local" required></label><label class="checkbox-field"><input name="hasAlarm" type="checkbox"> Adicionar alarme</label><label data-alarm-time hidden>Horário do alarme<input name="alarmTime" type="time"></label>`
+  if (type === 'contas') return `<label>Descrição<input name="title" required placeholder="Ex.: Mercado"></label><label>Valor em reais<input name="detail" data-money-input="true" inputmode="decimal" required placeholder="R$ 0,00"></label>`
   return `<label>Título<input name="title" required placeholder="Dê um nome para isso"></label><label>Detalhes<textarea name="detail" rows="4" placeholder="Escreva aqui..."></textarea></label>`
 }
 function showForm(type: string) {
@@ -91,21 +96,24 @@ function showForm(type: string) {
   const root = document.querySelector<HTMLDivElement>('#modal-root')!
   root.innerHTML = `<div class="modal-backdrop" data-close="true"><section class="add-sheet" role="dialog" aria-modal="true"><button class="close-modal" data-close="true">×</button><p class="eyebrow">${tool.icon} NOVO ITEM</p><h2>Adicionar em ${tool.label}</h2><form class="feature-form" id="item-form" data-type="${type}">${formFields(type)}<button class="primary-button" type="submit">Salvar item</button></form></section></div>`
   root.querySelectorAll<HTMLElement>('[data-close]').forEach((element) => element.addEventListener('click', (event) => { if (event.target === element || element.classList.contains('close-modal')) root.innerHTML = '' }))
+  root.querySelector<HTMLInputElement>('[data-money-input]')?.addEventListener('blur', (event) => { const input = event.currentTarget as HTMLInputElement; if (input.value.trim()) input.value = formatMoney(parseMoney(input.value)) })
+  root.querySelector<HTMLInputElement>('[name="hasAlarm"]')?.addEventListener('change', (event) => { const checkbox = event.currentTarget as HTMLInputElement; const alarmField = root.querySelector<HTMLElement>('[data-alarm-time]'); if (alarmField) alarmField.hidden = !checkbox.checked })
   root.querySelector<HTMLFormElement>('#item-form')?.addEventListener('submit', async (event) => {
     event.preventDefault()
     const data = new FormData(event.currentTarget as HTMLFormElement)
     let title = String(data.get('title') ?? 'Item')
     let detail = String(data.get('detail') ?? '')
     let image: string | undefined
-    if (type === 'calculadoras') { const first = Number(data.get('first')); const second = Number(data.get('second')); const operation = String(data.get('operation')); const result = operation === '+' ? first + second : operation === '-' ? first - second : operation === '*' ? first * second : second === 0 ? NaN : first / second; title = `Resultado: ${result}`; detail = `${first} ${operation} ${second}` }
     if (type === 'fotos' || type === 'arquivos') {
       const file = data.get('file') as File
       title = file?.name || 'Arquivo'
       if (type === 'fotos' && file?.type.startsWith('image/')) image = await fileToDataUrl(file)
     }
-    if (type === 'alarmes' && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
+    if (type === 'contas') detail = String(parseMoney(detail))
+    const alarmTime = type === 'agenda' && data.get('hasAlarm') ? String(data.get('alarmTime') ?? '') : undefined
+    if (alarmTime && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
     const items = getItems()
-    items.unshift({ id: crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: new Date().toLocaleDateString('pt-BR'), image })
+    items.unshift({ id: crypto.randomUUID(), type, title, detail: detail || 'Sem detalhes', createdAt: new Date().toLocaleDateString('pt-BR'), image, alarmTime: alarmTime || undefined })
     saveItems(items)
     root.innerHTML = ''
     render()
