@@ -68,6 +68,14 @@ function formatDueDate(value: string) {
   const parts = value.split('-')
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value
 }
+function formatHomeDate() { return new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).toLocaleUpperCase('pt-BR') }
+setInterval(() => {
+  const now = new Date()
+  const dateLabel = document.querySelector<HTMLElement>('[data-current-date]')
+  const dayLabel = document.querySelector<HTMLElement>('[data-current-day]')
+  if (dateLabel) dateLabel.textContent = formatHomeDate()
+  if (dayLabel) dayLabel.textContent = String(now.getDate()).padStart(2, '0')
+}, 60000)
 type Calculation = { id: string; expression: string; result: number }
 function calculatorKey() { return `hazuni-calculator-${userName.toLowerCase()}` }
 function getCalculations(): Calculation[] { return JSON.parse(localStorage.getItem(calculatorKey()) ?? '[]') as Calculation[] }
@@ -120,7 +128,7 @@ function render() {
 }
 
 function loginView() { return `<main class="login-page"><div class="login-brand"><span>H</span><strong>HAZUNI</strong></div><section class="login-card"><div class="login-mark">✦</div><p class="eyebrow">SEU ESPAÇO PESSOAL</p><h1>Como podemos<br><em>te chamar?</em></h1><p class="login-copy">Crie seu espaço no Hazuni e deixe tudo do seu jeito.</p><form id="login-form"><label for="user-name">Seu nome</label><input id="user-name" name="user-name" type="text" placeholder="Digite seu nome" maxlength="40" required><button class="primary-button" type="submit">Entrar no meu espaço <span>→</span></button></form><small class="login-note">Seus dados ficam salvos apenas neste aparelho.</small></section><div class="login-decoration" aria-hidden="true">✦</div></main>` }
-function homeView() { return `<section class="welcome reveal"><p class="eyebrow">QUARTA-FEIRA, 09 DE SETEMBRO</p><h1>Bom dia, ${escapeHtml(userName)} <span>✦</span></h1><p class="subtitle">Tudo o que você precisa, em um só lugar.</p></section><section class="spotlight reveal-delay"><div><span class="spotlight-label">SEU DIA EM FOCO</span><h2>Pequenos passos,<br><em>grandes ideias.</em></h2><p>Tenha mais clareza sobre o que importa hoje.</p><button class="text-button" data-tool="agenda">Ver minha agenda <span>→</span></button></div><div class="sun-art" aria-hidden="true"><i></i><b>✦</b><strong>09</strong></div></section><div class="section-heading"><div><p class="eyebrow">TUDO NO SEU RITMO</p><h2>Meu Espaço</h2></div><button class="view-all" data-nav="favorites">Ver favoritos <span>→</span></button></div><section class="tool-grid">${tools.map(toolCard).join('')}</section>` }
+function homeView() { return `<section class="welcome reveal"><p class="eyebrow" data-current-date>${formatHomeDate()}</p><h1>Bom dia, ${escapeHtml(userName)} <span>✦</span></h1><p class="subtitle">Tudo o que você precisa, em um só lugar.</p></section><section class="spotlight reveal-delay"><div><span class="spotlight-label">SEU DIA EM FOCO</span><h2>Pequenos passos,<br><em>grandes ideias.</em></h2><p>Tenha mais clareza sobre o que importa hoje.</p><button class="text-button" data-tool="agenda">Ver minha agenda <span>→</span></button></div><div class="sun-art" aria-hidden="true"><i></i><b>✦</b><strong data-current-day>${String(new Date().getDate()).padStart(2, '0')}</strong></div></section><div class="section-heading"><div><p class="eyebrow">TUDO NO SEU RITMO</p><h2>Meu Espaço</h2></div><button class="view-all" data-nav="favorites">Ver favoritos <span>→</span></button></div><section class="tool-grid">${tools.map(toolCard).join('')}</section>` }
 function itemList(type: string) {
   const items = getItems().filter((item) => item.type === type)
   if (!items.length) return `<div class="empty-state"><div>✦</div><h2>Nada por aqui ainda</h2><p>Adicione seu primeiro item para começar a organizar sua rotina.</p></div>`
